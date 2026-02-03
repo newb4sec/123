@@ -1,75 +1,160 @@
-
-}
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Catch the Heart 💖</title>
+  <title>Do You Really Know Me? 💖</title>
   <style>
     body {
       margin: 0;
-      overflow: hidden;
       height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
       background: linear-gradient(135deg, #ffecd2, #fcb69f);
       font-family: 'Poppins', sans-serif;
+      text-align: center;
     }
 
-    .heart {
-      position: absolute;
-      font-size: 40px;
-      cursor: pointer;
-      user-select: none;
-      transition: transform 0.2s;
+    .card {
+      background: white;
+      padding: 30px 25px;
+      border-radius: 25px;
+      box-shadow: 0 15px 40px rgba(0,0,0,0.25);
+      max-width: 500px;
+      width: 90%;
     }
 
-    .score {
-      position: fixed;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 24px;
+    h1 {
       color: #ff4d6d;
+      margin-bottom: 15px;
+    }
+
+    button {
+      padding: 10px 20px;
+      margin: 5px;
+      font-size: 16px;
+      border-radius: 25px;
+      border: none;
+      cursor: pointer;
+      background: #ff4d6d;
+      color: white;
+      transition: 0.3s ease;
+    }
+
+    button:hover {
+      background: #e63950;
+    }
+
+    .goal-message, .gif, .prize, .end-message {
+      display: none;
+      margin-top: 15px;
+      border-radius: 15px;
+    }
+
+    .goal-message, .prize, .end-message {
+      font-size: 18px;
       font-weight: bold;
+      color: #ff4d6d;
+      animation: popIn 0.8s ease;
+    }
+
+    @keyframes popIn {
+      from { transform: scale(0.5); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
     }
   </style>
 </head>
 <body>
-  <div class="score" id="score">Score: 0</div>
+  <div class="card">
+    <h1>Do You Really Know Me? 😏</h1>
+    <p>Only answer if you think you know me… or are willing to guess 😘</p>
+    <div id="question"></div>
+    <div id="options"></div>
+    <div class="goal-message" id="goalMsg">🎉 CORRECT! You know me well! 💖</div>
+    <img src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" class="gif" id="goalGif" alt="Celebration">
+    <div class="score" id="score" style="margin-top:15px; font-weight:bold; color:#ff4d6d; font-size:18px;">Score: 0</div>
+    <div class="final-goal" id="finalGoal" style="display:none; font-size:20px; color:#e63950; margin-top:15px; font-weight:bold;">🎯 Goal reached! You really know me 😘</div>
+    <div class="prize" id="prize">🤗 Your reward: A virtual hug!</div>
+    <div class="end-message" id="endMessage">🙏 Thank you for playing! Game over 😅</div>
+  </div>
 
   <script>
     let score = 0;
+    const goalScore = 100;
+    const scoreDisplay = document.getElementById('score');
 
-    function createHeart() {
-      const heart = document.createElement('div');
-      heart.className = 'heart';
-      heart.innerText = '💖';
-      heart.style.left = Math.random() * (window.innerWidth - 50) + 'px';
-      heart.style.top = Math.random() * (window.innerHeight - 50) + 'px';
-      document.body.appendChild(heart);
+    const quizQuestions = [
+      {q: "I wear this color more often than any other in my wardrobe. What is it?", options: ["Blue","Pink","Green","Red"], a: "pink"},
+      {q: "If you guessed my birthday month range, which one is correct?", options: ["Jan–Mar","Apr–Jun","Jul–Sep","Oct–Dec"], a: "jul–sep"},
+      {q: "When annoyed, my first reaction is… (don’t pick the obvious!)", options: ["Yell immediately","Stay quiet first","Eat something comfort food"], a: "stay quiet first"},
+      {q: "If I could watch only one type of movie for a year, I’d choose…", options: ["Animated","Live-action","Any good movie"], a: "Live-action"},
+      {q: "My secret comfort snack is…", options: ["Sweet","Salty","Something unusual"], a: "sweet"},
+      {q: "If a sad scene plays, I’m likely to…", options: ["Laugh first","Cry first"], a: "Cry first"},
+      {q: "I prefer the colors of…", options: ["Sunrise","Sunset"], a: "sunset"},
+      {q: "If I had to wear only one type of shoes for a year, which would I secretly pick?", options: ["Sneakers","Heels"], a: "sneakers"},
+      {q: "When I say ‘I’m fine’, what I really mean is…", options: ["Fine","Not fine"], a: "not fine"},
+      {q: "My ideal getaway would be…", options: ["City trip","Nature trip"], a: "nature trip"},
+      {q: "I secretly enjoy a hobby that not many know about. Which fits?", options: ["Reading","Gaming","Painting","Sleeping"], a: "Reading"},
+      {q: "On a lazy weekend, I’m most likely to…", options: ["Go out with friends","Stay in and relax","Exercise"], a: "stay in and relax"},
+      {q: "My favorite type of weather is…", options: ["Rainy","Sunny","Cloudy","Snowy"], a: "rainy"},
+      {q: "Which dessert always makes me happy?", options: ["Chocolate cake","Ice cream","Fruit tart","Donuts"], a: "Ice cream"},
+      {q: "I’m most productive in this part of the day…", options: ["Morning","Afternoon","Night"], a: "Morning"}
+    ];
 
-      heart.addEventListener('click', () => {
-        score++;
-        document.getElementById('score').innerText = 'Score: ' + score;
-        heart.remove();
-        createHeart(); // spawn new heart
-      });
+    const askedQuestions = new Set();
 
-      // Make heart move slowly down
-      let y = parseInt(heart.style.top);
-      const fall = setInterval(() => {
-        y += 1;
-        heart.style.top = y + 'px';
-        if (y > window.innerHeight) {
-          heart.remove();
-          createHeart();
-          clearInterval(fall);
+    function generateQuestion() {
+      if(askedQuestions.size === quizQuestions.length){
+        document.getElementById('question').style.display = 'none';
+        document.getElementById('options').style.display = 'none';
+        if(score >= goalScore){
+          document.getElementById('finalGoal').style.display = 'block';
+          document.getElementById('prize').style.display = 'block';
+        } else {
+          document.getElementById('endMessage').style.display = 'block';
         }
-      }, 20);
+        return;
+      }
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * quizQuestions.length);
+      } while(askedQuestions.has(idx));
+
+      askedQuestions.add(idx);
+      window.currentAnswer = quizQuestions[idx].a.toLowerCase();
+      const q = quizQuestions[idx];
+
+      document.getElementById('question').innerHTML = `<p>${q.q}</p>`;
+      const optionsDiv = document.getElementById('options');
+      optionsDiv.innerHTML = '';
+      q.options.forEach(opt => {
+        const btn = document.createElement('button');
+        btn.innerText = opt;
+        btn.onclick = () => checkAnswer(opt);
+        optionsDiv.appendChild(btn);
+      });
     }
 
-    // Start game with 1 heart
-    createHeart();
+    function checkAnswer(selected) {
+      if (selected.toLowerCase() === window.currentAnswer) {
+        document.getElementById('goalMsg').style.display = 'block';
+        document.getElementById('goalGif').style.display = 'block';
+        score += 10;
+      } else {
+        score = Math.max(0, score - 10);
+        alert('Oops! Wrong guess 😅 10 points deducted.');
+      }
+      scoreDisplay.innerText = 'Score: ' + score;
+
+      setTimeout(() => {
+        document.getElementById('goalMsg').style.display = 'none';
+        document.getElementById('goalGif').style.display = 'none';
+        generateQuestion();
+      }, 1500);
+    }
+
+    generateQuestion();
   </script>
 </body>
 </html>
