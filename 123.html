@@ -1,0 +1,401 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#define MAX_PLATES 8
+#define NOTE_MAX   0x8000
+
+typedef struct {
+    char plate_id[16];
+    char category[16];
+    size_t note_size;
+    char *note;
+    int locked;
+} plate_entry;
+
+static plate_entry *registry[MAX_PLATES];
+
+typedef struct {
+    char city_name[32];
+    void (*override_handler)(const char *);
+    unsigned long override_count;
+} control_block;
+
+static control_block *ctrl;
+
+static void log_alert(const char *plate);
+static void emergency_override(const char *plate);
+
+static void setup(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stdin, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+    alarm(120);
+}
+
+static void init_control(void) {
+    ctrl = calloc(1, sizeof(*ctrl));
+    if (!ctrl) {
+        puts("Control core unavailable.");
+        exit(1);
+    }
+
+    strncpy(ctrl->city_name, "Neo-Busan", sizeof(ctrl->city_name) - 1);
+    ctrl->override_handler = log_alert;
+    ctrl->override_count = 0;
+
+    plate_entry *e = calloc(1, sizeof(*e));
+    if (!e) {
+        puts("Control registry bootstrap failed.");
+        exit(1);
+    }
+
+    strncpy(e->plate_id, "SYS-CNTL", sizeof(e->plate_id) - 1);
+    strncpy(e->category, "LOCKED", sizeof(e->category) - 1);
+    e->note_size = sizeof(*ctrl);
+    e->note = (char *)ctrl;
+    e->locked = 1;
+    registry[MAX_PLATES - 1] = e;
+}
+
+static void read_line(char *buf, size_t len) {
+    if (!len) {
+        return;
+    }
+
+    if (!fgets(buf, len, stdin)) {
+        puts("Input error. Goodbye.");
+        exit(0);
+    }
+
+    char *nl = strchr(buf, '\n');
+    if (nl) {
+        *nl = '\0';
+    }
+}
+
+static unsigned long read_u64(void) {
+    char buf[0x40];
+    memset(buf, 0, sizeof(buf));
+    if (!fgets(buf, sizeof(buf), stdin)) {
+        puts("Input error. Goodbye.");
+        exit(0);
+    }
+    return strtoul(buf, NULL, 10);
+}
+
+static int select_slot(void) {
+    printf("Select slot (0-%d): ", MAX_PLATES - 1);
+    unsigned long idx = read_u64();
+    if (idx >= MAX_PLATES) {
+        puts("Out of range.");
+        return -1;
+    }
+    if (!registry[idx]) {
+        puts("No data in that slot.");
+        return -1;
+    }
+    if (registry[idx]->locked) {
+        puts("That slot is reserved for the city core.");
+        return -1;
+    }
+    return (int)idx;
+}
+
+static void register_vehicle(void) {
+    int slot = -1;
+    for (int i = 0; i < MAX_PLATES; i++) {
+        if (!registry[i]) {
+            slot = i;
+            break;
+        }
+        if (registry[i] && registry[i]->locked) {
+            continue;
+        }
+    }
+
+    if (slot == -1) {
+        puts("Registry full. Retire a vehicle entry first.");
+        return;
+    }
+
+    plate_entry *e = calloc(1, sizeof(*e));
+    if (!e) {
+        puts("Allocation failed.");
+        exit(1);
+    }
+
+    printf("License plate (max 15 chars): ");
+    read_line(e->plate_id, sizeof(e->plate_id));
+
+    printf("Vehicle category (AMBULANCE/EMS/etc, max 15 chars): ");
+    read_line(e->category, sizeof(e->category));
+
+    printf("Memo size (32-%d): ", NOTE_MAX);
+    unsigned long size = read_u64();
+    if (size < 32 || size > NOTE_MAX) {
+        puts("Invalid memo size.");
+        free(e);
+        return;
+    }
+
+    e->note_size = size;
+    e->note = malloc(e->note_size);
+    if (!e->note) {
+        puts("Allocation failed.");
+        free(e);
+        exit(1);
+    }
+
+    printf("Describe the intersection plan: ");
+    if (read(0, e->note, e->note_size) <= 0) {
+        puts("Reading memo failed.");
+        free(e->note);
+        free(e);
+        exit(1);
+    }
+
+    registry[slot] = e;
+    printf("Vehicle stored at slot %d.\n", slot);
+}
+
+static void edit_memo(void) {
+    int idx = select_slot();
+    if (idx < 0) {
+        return;
+    }
+
+    plate_entry *e = registry[idx];
+    if (!e->note_size) {
+        puts("No memo allocated for this entry.");
+        return;
+    }
+
+    printf("Update memo (%zu bytes max): ", e->note_size);
+    if (read(0, e->note, e->note_size) <= 0) {
+        puts("Update failed.");
+        exit(1);
+    }
+
+    puts("Memo updated.");
+}
+
+static void show_memo(void) {
+    int idx = select_slot();
+    if (idx < 0) {
+        return;
+    }
+
+    plate_entry *e = registry[idx];
+    if (!e->note) {
+        puts("Memo already cleared.");
+        return;
+    }
+
+    printf("--- Memo for %s ---\n", e->plate_id);
+    if (write(1, e->note, e->note_size) <= 0) {
+        puts("[!] Transmission error.");
+    }
+    puts("\n------------------------");
+}
+
+static void clear_memo(void) {
+    int idx = select_slot();
+    if (idx < 0) {
+        return;
+    }
+
+    plate_entry *e = registry[idx];
+    if (!e->note) {
+        puts("Memo already cleared.");
+        return;
+    }
+
+    free(e->note);
+    puts("Memo cleared to conserve memory.");
+}
+
+static void log_alert(const char *plate) {
+    printf("Logging override request for %s.\n", plate);
+}
+
+__attribute__((used))
+static void emergency_override(const char *plate) {
+    (void)plate;
+    puts("Prioritizing emergency vehicle. Opening maintenance shell...");
+    char *const argv[] = {"sh", "-i", NULL};
+    if (execvp("sh", argv) == -1) {
+        puts("Shell launch failed.");
+    }
+}
+
+static void trigger_override(void) {
+    printf("Select slot (0-%d): ", MAX_PLATES - 1);
+    unsigned long idx = read_u64();
+    if (idx >= MAX_PLATES || !registry[idx]) {
+        puts("Invalid slot.");
+        return;
+    }
+
+    plate_entry *e = registry[idx];
+    printf("Triggering override workflow for %s...\n", e->plate_id);
+    if (!ctrl) {
+        log_alert(e->plate_id);
+        return;
+    }
+    ctrl->override_count++;
+    ctrl->override_handler(e->plate_id);
+}
+
+static void list_registry(void) {
+    puts("\nActive vehicle slots:");
+    for (int i = 0; i < MAX_PLATES; i++) {
+        if (registry[i]) {
+            printf("[%d] %s (%s)%s memo=%p size=%zu\n", i,
+                   registry[i]->plate_id,
+                   registry[i]->category,
+                   registry[i]->locked ? " [LOCKED]" : "",
+                   registry[i]->note,
+                   registry[i]->note_size);
+        } else {
+            printf("[%d] <empty>\n", i);
+        }
+    }
+    puts("");
+}
+
+static void menu(void) {
+    puts("================ Smart-Traffic Intersections ================");
+    puts("1) Register emergency vehicle");
+    puts("2) Update intersection memo");
+    puts("3) Review memo");
+    puts("4) Clear memo");
+    puts("5) Trigger emergency override");
+    puts("6) List registry");
+    puts("7) Control analytics");
+    puts("0) Exit");
+    printf(">> ");
+}
+
+static void analytics(void) {
+    if (!ctrl) {
+        puts("Control core offline.");
+        return;
+    }
+    printf("City node: %s\n", ctrl->city_name);
+    printf("Override handler @ %p\n", (void *)ctrl->override_handler);
+    printf("Override count: %lu\n", ctrl->override_count);
+}
+
+int main(void) {
+    setup();
+    init_control();
+
+    while (1) {
+        menu();
+        unsigned long choice = read_u64();
+        switch (choice) {
+        case 1:
+            register_vehicle();
+            break;
+        case 2:
+            edit_memo();
+            break;
+        case 3:
+            show_memo();
+            break;
+        case 4:
+            clear_memo();
+            break;
+        case 5:
+            trigger_override();
+            break;
+        case 6:
+            list_registry();
+            break;
+        case 7:
+            analytics();
+            break;
+        case 0:
+            puts("Goodbye.");
+            return 0;
+        default:
+            puts("Invalid choice.");
+            break;
+        }
+    }
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catch the Heart 💖</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      height: 100vh;
+      background: linear-gradient(135deg, #ffecd2, #fcb69f);
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .heart {
+      position: absolute;
+      font-size: 40px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s;
+    }
+
+    .score {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      color: #ff4d6d;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="score" id="score">Score: 0</div>
+
+  <script>
+    let score = 0;
+
+    function createHeart() {
+      const heart = document.createElement('div');
+      heart.className = 'heart';
+      heart.innerText = '💖';
+      heart.style.left = Math.random() * (window.innerWidth - 50) + 'px';
+      heart.style.top = Math.random() * (window.innerHeight - 50) + 'px';
+      document.body.appendChild(heart);
+
+      heart.addEventListener('click', () => {
+        score++;
+        document.getElementById('score').innerText = 'Score: ' + score;
+        heart.remove();
+        createHeart(); // spawn new heart
+      });
+
+      // Make heart move slowly down
+      let y = parseInt(heart.style.top);
+      const fall = setInterval(() => {
+        y += 1;
+        heart.style.top = y + 'px';
+        if (y > window.innerHeight) {
+          heart.remove();
+          createHeart();
+          clearInterval(fall);
+        }
+      }, 20);
+    }
+
+    // Start game with 1 heart
+    createHeart();
+  </script>
+</body>
+</html>
