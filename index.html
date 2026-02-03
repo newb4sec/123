@@ -46,7 +46,7 @@
       background: #e63950;
     }
 
-    .goal-message, .gif, .prize, .end-message {
+    .goal-message, .gif, .prize, .end-message, .fail-gif {
       display: none;
       margin-top: 15px;
       border-radius: 15px;
@@ -73,6 +73,7 @@
     <div id="options"></div>
     <div class="goal-message" id="goalMsg">🎉 CORRECT! You know me well! 💖</div>
     <img src="https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif" class="gif" id="goalGif" alt="Celebration">
+    <img src="https://media.giphy.com/media/14uQ3cOFteDaU/giphy.gif" class="fail-gif" id="failGif" alt="Sad" style="width:200px;">
     <div class="score" id="score" style="margin-top:15px; font-weight:bold; color:#ff4d6d; font-size:18px;">Score: 0</div>
     <div class="final-goal" id="finalGoal" style="display:none; font-size:20px; color:#e63950; margin-top:15px; font-weight:bold;">🎯 Goal reached! You really know me 😘</div>
     <div class="prize" id="prize">🤗 Your reward: A virtual hug!</div>
@@ -85,21 +86,16 @@
     const scoreDisplay = document.getElementById('score');
 
     const quizQuestions = [
-      {q: "I wear this color more often than any other in my wardrobe. What is it?", options: ["Blue","Pink","Green","Red"], a: "pink"},
-      {q: "If you guessed my birthday month range, which one is correct?", options: ["Jan–Mar","Apr–Jun","Jul–Sep","Oct–Dec"], a: "jul–sep"},
-      {q: "When annoyed, my first reaction is…)", options: ["Yell immediately","Stay quiet first","Eat something comfort food"], a: "stay quiet first"},
-      {q: "If I could watch only one type of movie for a year, I’d choose…", options: ["Animated","Live-action","Any good movie"], a: "Live-action"},
-      {q: "My secret comfort snack is…", options: ["Sweet","Salty","Something unusual"], a: "sweet"},
-      {q: "If a sad scene plays, I’m likely to…", options: ["Laugh first","Cry first"], a: "Cry first"},
-      {q: "I prefer the colors of…", options: ["Sunrise","Sunset"], a: "sunset"},
-      {q: "If I had to wear only one type of shoes for a year, which would I secretly pick?", options: ["Sneakers","Heels"], a: "sneakers"},
-      {q: "When I say ‘I’m fine’, what I really mean is…", options: ["Fine","Not fine"], a: "not fine"},
-      {q: "My ideal getaway would be…", options: ["City trip","Nature trip"], a: "City trip"},
-      {q: "I secretly enjoy a hobby that not many know about. Which fits?", options: ["Reading","Gaming","Painting","Sleeping"], a: "Reading"},
-      {q: "On a lazy weekend, I’m most likely to…", options: ["Go out with friends","Stay in and relax","Exercise"], a: "stay in and relax"},
-      {q: "My favorite type of weather is…", options: ["Rainy","Sunny","Cloudy","Snowy"], a: "rainy"},
-      {q: "Which dessert always makes me happy?", options: ["Chocolate cake","Ice cream","Fruit tart","Donuts"], a: "Ice cream"},
-      {q: "I’m most productive in this part of the day…", options: ["Morning","Afternoon","Night"], a: "Morning"}
+      {q: "If I could only eat one type of dessert forever, which would I secretly choose?", options: ["Matcha sweets","Chocolate lava cake","Cheesecake","Exotic fruit tart"], a: "matcha sweets"},
+      {q: "Which unusual hobby would I do just for fun?", options: ["Making tiny dioramas","Learning obscure languages","Collecting vintage teacups","Speed reading poetry"], a: "Learning obscure languages"},
+      {q: "If I could live inside a fictional world, which one would I pick?", options: ["Studio Ghibli movies","Harry Potter","Stranger Things","Narnia"], a: "Stranger Things"},
+      {q: "My guilty pleasure that surprises people…", options: ["Watching weirdly niche reality shows","Eating dessert before dinner","Talking in movie quotes","Humming tunes while working"], a: "Eating dessert before dinner"},
+      {q: "I have a hidden talent that most never notice…", options: ["Sketching tiny portraits","Speed origami folding","Perfecting unusual accents","Remembering odd trivia"], a: "Perfecting unusual accents"},
+      {q: "Which unexpected place would I go for inspiration?", options: ["Rooftops","Cafes at midnight","Antique stores","Reading at Quiet gardens"], a: "Reading at Quiet gardens"},
+      {q: "If I could magically teleport anywhere for 10 minutes, where would it be?", options: ["Secret rooftop garden","Abandoned library","Hidden beach","Famous art museum"], a: "hidden beach"},
+      {q: "A random quirky habit I do that I’ll never admit first…", options: ["Naming my plants","Talking to inanimate objects","Making up socmed videos","Collecting oddly shaped stones"], a: "Making up socmed videos"},
+      {q: "The most unexpected way I’d spend a Saturday…", options: ["Building a fort at home","Taking a spontaneous trip","Joining a silent disco","Baking something experimental"], a: "Taking a spontaneous trip"},
+      {q: "My secret snack that no one expects me to love…", options: ["Wasabi peas","Salty chocolate","Pickled mango","Spicy caramel popcorn"], a: "spicy caramel popcorn"}
     ];
 
     const askedQuestions = new Set();
@@ -143,13 +139,14 @@
         score += 10;
       } else {
         score = Math.max(0, score - 10);
-        alert('Oops! Wrong guess 😅 10 points deducted.');
+        document.getElementById('failGif').style.display = 'block';
       }
       scoreDisplay.innerText = 'Score: ' + score;
 
       setTimeout(() => {
         document.getElementById('goalMsg').style.display = 'none';
         document.getElementById('goalGif').style.display = 'none';
+        document.getElementById('failGif').style.display = 'none';
         generateQuestion();
       }, 1500);
     }
