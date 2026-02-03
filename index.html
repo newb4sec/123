@@ -1,0 +1,75 @@
+
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catch the Heart 💖</title>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      height: 100vh;
+      background: linear-gradient(135deg, #ffecd2, #fcb69f);
+      font-family: 'Poppins', sans-serif;
+    }
+
+    .heart {
+      position: absolute;
+      font-size: 40px;
+      cursor: pointer;
+      user-select: none;
+      transition: transform 0.2s;
+    }
+
+    .score {
+      position: fixed;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 24px;
+      color: #ff4d6d;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <div class="score" id="score">Score: 0</div>
+
+  <script>
+    let score = 0;
+
+    function createHeart() {
+      const heart = document.createElement('div');
+      heart.className = 'heart';
+      heart.innerText = '💖';
+      heart.style.left = Math.random() * (window.innerWidth - 50) + 'px';
+      heart.style.top = Math.random() * (window.innerHeight - 50) + 'px';
+      document.body.appendChild(heart);
+
+      heart.addEventListener('click', () => {
+        score++;
+        document.getElementById('score').innerText = 'Score: ' + score;
+        heart.remove();
+        createHeart(); // spawn new heart
+      });
+
+      // Make heart move slowly down
+      let y = parseInt(heart.style.top);
+      const fall = setInterval(() => {
+        y += 1;
+        heart.style.top = y + 'px';
+        if (y > window.innerHeight) {
+          heart.remove();
+          createHeart();
+          clearInterval(fall);
+        }
+      }, 20);
+    }
+
+    // Start game with 1 heart
+    createHeart();
+  </script>
+</body>
+</html>
